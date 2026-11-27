@@ -1,0 +1,37 @@
+name: Build unsigned iOS IPA
+on:
+  workflow_dispatch:
+env:
+  GODOT_VERSION: "4.7.1-stable"
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot + export templates
+        run: |
+          V="${GODOT_VERSION}"
+          BASE="https://github.com/godotengine/godot-builds/releases/download/${V}"
+          curl -L -o godot.zip "${BASE}/Godot_v${V}_macos.universal.zip"
+          curl -L -o templates.tpz "${BASE}/Godot_v${V}_export_templates.tpz"
+          unzip -q godot.zip
+          T="$HOME/Library/Application Support/Godot/export_templates/${V/-/.}"
+          mkdir -p "$T" && unzip -q templates.tpz -d tpl && cp -R tpl/templates/* "$T/"
+      - name: Import + export Xcode project
+        run: |
+          GODOT="./Godot.app/Contents/MacOS/Godot"
+          $GODOT --headless --import || true
+          mkdir -p build/ios
+          $GODOT --headless --export-release "iOS" build/ios/scag.xcodeproj
+      - name: Build unsigned .app and package IPA
+        run: |
+          cd build/ios
+          xcodebuild -project scag.xcodeproj -scheme scag -configuration Release \
+            -sdk iphoneos -arch arm64 -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir Payload && cp -R dd/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qry ../../scag-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scag-unsigned-ipa
+          path: scag-unsigned.ipa
