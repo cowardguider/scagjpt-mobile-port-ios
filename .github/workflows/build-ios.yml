@@ -25,6 +25,26 @@ jobs:
         run: |
           perl -0pi -e 's/(func rendering_method_callback\([^\n]*\n)/$1\tif OS.has_feature("ios"):\n\t\treturn\n/' code/autoloads/data/game_settings.gd
           grep -n -A3 "func rendering_method_callback" code/autoloads/data/game_settings.gd
+      - name: Patch iOS input
+        run: |
+          python3 - <<'PYEOF'
+          def patch(path, old, new):
+              s = open(path, encoding="utf-8").read()
+              if old not in s:
+                  print("NOT FOUND:", path, old[:40])
+                  return
+              open(path, "w", encoding="utf-8").write(s.replace(old, new, 1))
+              print("patched:", path)
+          patch("code/autoloads/util.gd",
+              'func get_mouse_position() -> Vector2i:\n\treturn DisplayServer',
+              'func get_mouse_position() -> Vector2i:\n\tif OS.has_feature("ios"):\n\t\treturn Vector2i(get_viewport().get_mouse_position())\n\treturn DisplayServer')
+          patch("objects/character/character_worker.gd",
+              'const TIME_LIMIT_TO_POKE: float = 0.15',
+              'const TIME_LIMIT_TO_POKE: float = 0.35')
+          patch("objects/character/character_worker.gd",
+              '\tGlobals.character = self\n',
+              '\tGlobals.character = self\n\tif OS.has_feature("ios"):\n\t\tGlobals.drag_enabled.add(99, false)\n')
+          PYEOF
 
       - name: Install Godot + export templates
         run: |
