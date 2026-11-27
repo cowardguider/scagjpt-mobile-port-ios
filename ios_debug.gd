@@ -3,14 +3,15 @@ extends CanvasLayer
 var label: Label
 var t := 0.0
 var last_event := ""
+var scroll_accum := 0.0
 
 func _ready() -> void:
     layer = 128
     process_mode = Node.PROCESS_MODE_ALWAYS
     var bg := ColorRect.new()
-    bg.color = Color(0, 0, 0, 0.6)
+    bg.color = Color(0, 0, 0, 0.5)
     bg.position = Vector2(0, 40)
-    bg.size = Vector2(740, 270)
+    bg.size = Vector2(560, 150)
     bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(bg)
     label = Label.new()
@@ -32,23 +33,38 @@ func _press_menu() -> void:
     await get_tree().process_frame
     Input.action_release("right_click")
 
+func _wheel(up: bool, pos: Vector2) -> void:
+    var w := InputEventMouseButton.new()
+    w.button_index = MOUSE_BUTTON_WHEEL_UP if up else MOUSE_BUTTON_WHEEL_DOWN
+    w.position = pos
+    w.global_position = pos
+    w.pressed = true
+    Input.parse_input_event(w)
+    var r := InputEventMouseButton.new()
+    r.button_index = w.button_index
+    r.position = pos
+    r.global_position = pos
+    r.pressed = false
+    Input.parse_input_event(r)
+
 func _input(event: InputEvent) -> void:
     if event is InputEventScreenTouch or event is InputEventMouseButton:
         last_event = event.as_text()
     if event is InputEventScreenTouch and event.pressed and event.index == 1:
         _press_menu()
+    if event is InputEventScreenDrag and event.index == 0 and Globals.character:
+        if Globals.character.state == CharacterWorker.States.MENU_MODE:
+            scroll_accum += event.relative.y
+            while absf(scroll_accum) > 24.0:
+                _wheel(scroll_accum > 0.0, event.position)
+                scroll_accum -= 24.0 * signf(scroll_accum)
 
 func _process(delta: float) -> void:
     t += delta
     if t < 1.0:
         return
     t = 0.0
-    var scene := get_tree().current_scene
-    var cam := get_viewport().get_camera_3d()
-    var text := "scene: %s\n" % (scene.scene_file_path if scene else "none")
-    text += "viewport: %s\n" % str(get_viewport().get_visible_rect().size)
-    text += "camera: %s\n" % (str(cam.global_position) if cam else "none")
-    text += "character: %s\n" % str(Globals.character != null)
+    var text := ""
     if Globals.character:
         text += "state: %s\n" % str(CharacterWorker.States.find_key(Globals.character.state))
     text += "last input: %s\n" % last_event
