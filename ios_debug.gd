@@ -4,6 +4,8 @@ var label: Label
 var t := 0.0
 var last_event := ""
 var scroll_accum := 0.0
+var btn: Button
+
 
 func _ready() -> void:
     layer = 128
@@ -19,7 +21,7 @@ func _ready() -> void:
     label.add_theme_font_size_override("font_size", 20)
     label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(label)
-    var btn := Button.new()
+    btn = Button.new()
     btn.text = "MENU"
     var vs := get_viewport().get_visible_rect().size
     btn.size = Vector2(170, 90)
@@ -28,6 +30,8 @@ func _ready() -> void:
     add_child(btn)
 
 func _press_menu() -> void:
+    var vs := get_viewport().get_visible_rect().size
+    btn.position = Vector2(vs.x - 190, vs.y - 330)
     Input.action_press("right_click")
     await get_tree().process_frame
     await get_tree().process_frame
