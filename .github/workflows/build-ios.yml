@@ -6,8 +6,12 @@ env:
 jobs:
   build:
     runs-on: macos-latest
-    steps:
+        steps:
       - uses: actions/checkout@v4
+      - name: Unpack project zips
+        run: |
+          for z in scag_part*.zip; do unzip -q -o "$z"; done
+          ls
       - name: Install Godot + export templates
         run: |
           V="${GODOT_VERSION}"
