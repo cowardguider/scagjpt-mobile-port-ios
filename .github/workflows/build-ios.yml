@@ -12,6 +12,12 @@ jobs:
         run: |
           for z in scag_part*.zip; do unzip -q -o "$z"; done
           ls
+      - name: Enable log access
+        run: |
+          sed -i '' 's/accessible_from_files_app=false/accessible_from_files_app=true/' export_presets.cfg
+          sed -i '' 's/accessible_from_itunes_sharing=false/accessible_from_itunes_sharing=true/' export_presets.cfg
+          grep accessible export_presets.cfg
+
       - name: Install Godot + export templates
         run: |
           V="${GODOT_VERSION}"
