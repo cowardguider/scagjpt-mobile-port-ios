@@ -17,6 +17,10 @@ jobs:
           sed -i '' 's/accessible_from_files_app=false/accessible_from_files_app=true/' export_presets.cfg
           sed -i '' 's/accessible_from_itunes_sharing=false/accessible_from_itunes_sharing=true/' export_presets.cfg
           grep accessible export_presets.cfg
+      - name: Register debug overlay
+        run: |
+          perl -0pi -e 's|\[autoload\]\n|[autoload]\nIosDebug="*res://ios_debug.gd"\n|' project.godot
+          grep -n IosDebug project.godot
 
       - name: Install Godot + export templates
         run: |
