@@ -21,6 +21,10 @@ jobs:
         run: |
           perl -0pi -e 's|\[autoload\]\n|[autoload]\nIosDebug="*res://ios_debug.gd"\n|' project.godot
           grep -n IosDebug project.godot
+      - name: Patch renderer restart for iOS
+        run: |
+          perl -0pi -e 's/(func rendering_method_callback\([^\n]*\n)/$1\tif OS.has_feature("ios"):\n\t\treturn\n/' code/autoloads/data/game_settings.gd
+          grep -n -A3 "func rendering_method_callback" code/autoloads/data/game_settings.gd
 
       - name: Install Godot + export templates
         run: |
