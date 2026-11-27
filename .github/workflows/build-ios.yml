@@ -25,7 +25,7 @@ jobs:
         run: |
           perl -0pi -e 's/(func rendering_method_callback\([^\n]*\n)/$1\tif OS.has_feature("ios"):\n\t\treturn\n/' code/autoloads/data/game_settings.gd
           grep -n -A3 "func rendering_method_callback" code/autoloads/data/game_settings.gd
-      - name: Patch iOS input
+      - name: Patch iOS input, centering and roaming
         run: |
           python3 - <<'PYEOF'
           def patch(path, old, new):
@@ -43,9 +43,26 @@ jobs:
               'const TIME_LIMIT_TO_POKE: float = 0.35')
           patch("objects/character/character_worker.gd",
               '\tGlobals.character = self\n',
-              '\tGlobals.character = self\n\tif OS.has_feature("ios"):\n\t\tGlobals.drag_enabled.add(99, false)\n')
+              '\tGlobals.character = self\n\tif OS.has_feature("ios"):\n\t\tGlobals.drag_enabled.add(99, false)\n\t\troaming_enabled = true\n')
+          patch("code/autoloads/screen_bounds.gd",
+              '\n\tget_window().size = value\n',
+              '\n\tif not OS.has_feature("ios"):\n\t\tget_window().size = value\n')
+          patch("objects/character/camera_follower.gd",
+              '\tGlobals.camera = self\n',
+              '\tGlobals.camera = self\n\tif OS.has_feature("ios"):\n\t\tkeep_aspect = Camera3D.KEEP_WIDTH\n\t\tfov = 19.8\n')
+          patch("objects/character/camera_follower.gd",
+              'var window_size = DisplayServer.window_get_size(0)',
+              'var window_size = Vector2i(get_viewport().get_visible_rect().size) if OS.has_feature("ios") else DisplayServer.window_get_size(0)')
+          patch("objects/character/camera_follower.gd",
+              'var diff: Vector2i = ScreenBounds.target_window_position - DisplayServer.window_get_position()',
+              'var diff: Vector2i = Vector2i.ZERO if OS.has_feature("ios") else ScreenBounds.target_window_position - DisplayServer.window_get_position()')
+          patch("objects/character/camera_follower.gd",
+              '\telse:\n\t\treset()',
+              '\telse:\n\t\treset()\n\tif OS.has_feature("ios") and not Globals.character.state in [CharacterWorker.States.MENU_MODE, CharacterWorker.States.RAGDOLLED]:\n\t\tvar vp = get_viewport().get_visible_rect().size\n\t\tvar d = absf(position.z - Globals.character.global_position.z)\n\t\tvar per_px = 2.0 * d * tan(deg_to_rad(fov) / 2.0) / vp.x\n\t\tvar off = Vector2(ScreenBounds.target_window_position) * vp / Vector2(DisplayServer.window_get_size(0))\n\t\tposition.x -= off.x * per_px\n\t\tposition.y += off.y * per_px')
+          patch("objects/character/roaming_controller.gd",
+              'func get_random_roam_position(target_screen: int = Util.get_current_screen()) -> Vector2i:\n',
+              'func get_random_roam_position(target_screen: int = Util.get_current_screen()) -> Vector2i:\n\tif OS.has_feature("ios"):\n\t\tvar ws = DisplayServer.window_get_size(0)\n\t\treturn Vector2i(randi_range(-ws.x / 2 + 300, ws.x / 2 - 300), randi_range(-ws.y / 2 + 460, ws.y / 2 - 460))\n')
           PYEOF
-
       - name: Install Godot + export templates
         run: |
           V="${GODOT_VERSION}"
