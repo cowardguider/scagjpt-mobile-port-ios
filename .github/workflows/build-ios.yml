@@ -25,25 +25,52 @@ jobs:
         run: |
           perl -0pi -e 's/(func rendering_method_callback\([^\n]*\n)/$1\tif OS.has_feature("ios"):\n\t\treturn\n/' code/autoloads/data/game_settings.gd
           grep -n -A3 "func rendering_method_callback" code/autoloads/data/game_settings.gd
-      - name: Patch iOS input, centering, roaming, animations and dialogue
+      - name: Patch iOS input, drag, roaming, animations and dialogue
         run: |
           python3 - <<'PYEOF'
-          def patch(path, old, new):
+          def patch(path, old, new, count=1):
               s = open(path, encoding="utf-8").read()
               if old not in s:
                   print("NOT FOUND:", path, old[:40])
                   return
-              open(path, "w", encoding="utf-8").write(s.replace(old, new, 1))
+              open(path, "w", encoding="utf-8").write(s.replace(old, new, count))
               print("patched:", path)
           patch("code/autoloads/util.gd",
               'func get_mouse_position() -> Vector2i:\n\treturn DisplayServer',
               'func get_mouse_position() -> Vector2i:\n\tif OS.has_feature("ios"):\n\t\treturn Vector2i(get_viewport().get_mouse_position())\n\treturn DisplayServer')
+          patch("code/autoloads/util.gd",
+              'func get_current_screen() -> int:',
+              'func ios_scale() -> Vector2:\n\tif OS.has_feature("ios"):\n\t\treturn Vector2(DisplayServer.window_get_size(0)) / get_viewport().get_visible_rect().size\n\treturn Vector2.ONE\n\n\nfunc get_global_mouse() -> Vector2i:\n\tif OS.has_feature("ios"):\n\t\treturn Vector2i(get_viewport().get_mouse_position() * ios_scale())\n\treturn DisplayServer.mouse_get_position()\n\n\nfunc get_current_screen() -> int:')
           patch("objects/character/character_worker.gd",
               'const TIME_LIMIT_TO_POKE: float = 0.15',
               'const TIME_LIMIT_TO_POKE: float = 0.35')
           patch("objects/character/character_worker.gd",
               '\tGlobals.character = self\n',
-              '\tGlobals.character = self\n\tif OS.has_feature("ios"):\n\t\tGlobals.drag_enabled.add(99, false)\n\t\troaming_enabled = true\n')
+              '\tGlobals.character = self\n\tif OS.has_feature("ios"):\n\t\troaming_enabled = true\n')
+          patch("objects/character/character_worker.gd",
+              'DisplayServer.mouse_get_position()',
+              'Util.get_global_mouse()', -1)
+          patch("objects/character/character_worker.gd",
+              '_drag_lerp = - Util.get_mouse_position()',
+              '_drag_lerp = - Vector2(Util.get_mouse_position()) * Util.ios_scale()')
+          patch("objects/character/character_worker.gd",
+              'unproject_position(rig.grab_position.global_position)\n',
+              'unproject_position(rig.grab_position.global_position) * Util.ios_scale()\n')
+          patch("objects/character/character_worker.gd",
+              '\t\tScreenBounds.set_position_raw(mouse_pos + Vector2i(_drag_lerp))\n',
+              '\t\tvar drag_target = mouse_pos + Vector2i(_drag_lerp)\n\t\tif OS.has_feature("ios"):\n\t\t\tvar ws = DisplayServer.window_get_size(0)\n\t\t\tdrag_target = Vector2i(clampi(drag_target.x, -ws.x / 2 + 240, ws.x / 2 - 240), clampi(drag_target.y, -ws.y / 2 + 420, ws.y / 2 - 420))\n\t\tScreenBounds.set_position_raw(drag_target)\n')
+          patch("objects/character/character_worker.gd",
+              'if _mouse_velocity.length() > 4:',
+              'if _mouse_velocity.length() > 4 and not OS.has_feature("ios"):')
+          patch("objects/character/character_worker.gd",
+              '\t\t\t\tif Input.is_action_pressed("hold"):\n\t\t\t\t\t_last_click += delta',
+              '\t\t\t\tif Input.is_action_pressed("hold") and _ios_hit():\n\t\t\t\t\t_last_click += delta')
+          patch("objects/character/character_worker.gd",
+              'if _last_click < TIME_LIMIT_TO_POKE and Globals.poke_enabled.get_prioritized_value() and _can_click == 0:',
+              'if (_last_click > 0.0 or not OS.has_feature("ios")) and _last_click < TIME_LIMIT_TO_POKE and Globals.poke_enabled.get_prioritized_value() and _can_click == 0:')
+          patch("objects/character/character_worker.gd",
+              'func _process_after_anim():',
+              'func _ios_hit() -> bool:\n\tif not OS.has_feature("ios"):\n\t\treturn true\n\tvar cam = get_viewport().get_camera_3d()\n\tif cam == null:\n\t\treturn true\n\tvar bb = rig.global_transform * rig.get_bounding_box()\n\tvar rect = Rect2(cam.unproject_position(bb.get_endpoint(0)), Vector2.ZERO)\n\tfor i in range(1, 8):\n\t\trect = rect.expand(cam.unproject_position(bb.get_endpoint(i)))\n\treturn rect.grow(60.0).has_point(Vector2(get_viewport().get_mouse_position()))\n\n\nfunc _process_after_anim():')
           patch("code/autoloads/screen_bounds.gd",
               '\n\tget_window().size = value\n',
               '\n\tif not OS.has_feature("ios"):\n\t\tget_window().size = value\n')
