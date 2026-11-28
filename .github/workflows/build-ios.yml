@@ -25,7 +25,7 @@ jobs:
         run: |
           perl -0pi -e 's/(func rendering_method_callback\([^\n]*\n)/$1\tif OS.has_feature("ios"):\n\t\treturn\n/' code/autoloads/data/game_settings.gd
           grep -n -A3 "func rendering_method_callback" code/autoloads/data/game_settings.gd
-      - name: Patch iOS input, centering and roaming
+      - name: Patch iOS input, centering, roaming, animations and dialogue
         run: |
           python3 - <<'PYEOF'
           def patch(path, old, new):
@@ -71,13 +71,12 @@ jobs:
           patch("scenes/rigs/rig.gd",
               'func set_animation_state(state: AnimationStates) -> void :',
               'func _fix_animation_paths() -> void:\n\tif animator == null or skeleton == null:\n\t\treturn\n\tvar root_node = animator.get_node_or_null(animator.root_node)\n\tif root_node == null:\n\t\treturn\n\tvar skel_path = str(root_node.get_path_to(skeleton))\n\tvar count = 0\n\tfor lib_name in animator.get_animation_library_list():\n\t\tvar lib = animator.get_animation_library(lib_name)\n\t\tfor anim_name in lib.get_animation_list():\n\t\t\tvar anim = lib.get_animation(anim_name)\n\t\t\tfor i in range(anim.get_track_count()):\n\t\t\t\tvar t = anim.track_get_type(i)\n\t\t\t\tif t == Animation.TYPE_POSITION_3D or t == Animation.TYPE_ROTATION_3D or t == Animation.TYPE_SCALE_3D:\n\t\t\t\t\tvar bone = anim.track_get_path(i).get_concatenated_subnames()\n\t\t\t\t\tif bone != "" and skeleton.find_bone(bone) >= 0:\n\t\t\t\t\t\tanim.track_set_path(i, NodePath(skel_path + ":" + bone))\n\t\t\t\t\t\tcount += 1\n\tanimation_tree.clear_caches()\n\tprinterr("[ANIMFIX] retargeted tracks: ", count, " path: ", skel_path)\n\n\nfunc set_animation_state(state: AnimationStates) -> void :')
-         patch("interface/dialogue/dialogue.gd",
+          patch("interface/dialogue/dialogue.gd",
               '\tif target_window:\n\t\tvar screen_position: Vector2i = DisplayServer.window_get_position(target_window.get_window_id())',
               '\tif OS.has_feature("ios"):\n\t\t_ios_position(delta)\n\t\treturn\n\tif target_window:\n\t\tvar screen_position: Vector2i = DisplayServer.window_get_position(target_window.get_window_id())')
           patch("interface/dialogue/dialogue.gd",
               'func _process(delta: float) -> void :',
               'func _ios_position(delta: float) -> void:\n\tvar vp = Vector2(get_tree().root.get_visible_rect().size)\n\tvar ws = Vector2(get_contents_minimum_size())\n\tvar target = Vector2.ZERO\n\tis_going_downward = false\n\tif target_window:\n\t\tvar tp = Vector2(target_window.position)\n\t\tvar ts = Vector2(target_window.get_contents_minimum_size())\n\t\ttarget = tp + Vector2(ts.x / 2.0 - ws.x / 2.0, -10.0 - ws.y)\n\t\tif target_window.is_going_downward or target.y < 0.0:\n\t\t\tis_going_downward = true\n\t\t\ttarget = tp + Vector2(ts.x / 2.0 - ws.x / 2.0, ts.y + 10.0)\n\telif Globals.character:\n\t\tvar bb = Globals.character.rig.global_transform * Globals.character.rig.get_bounding_box()\n\t\tvar top = bb.get_center() + Vector3(0, bb.size.y + DIALOGUE_OFFSET, 0) / 2\n\t\ttarget = Globals.camera.unproject_position(top) - Vector2(ws.x / 2.0, ws.y)\n\t\tif target.y < 0.0:\n\t\t\tvar bottom = bb.get_center() + Vector3(0, -bb.size.y - BOTTOM_DIALOGUE_OFFSET, 0) / 2\n\t\t\ttarget = Globals.camera.unproject_position(bottom) - Vector2(ws.x / 2.0, 0.0)\n\t\t\tis_going_downward = true\n\ttarget.x = clampf(target.x, 0.0, maxf(vp.x - ws.x, 0.0))\n\ttarget.y = clampf(target.y, 0.0, maxf(vp.y - ws.y, 0.0))\n\tposition = Vector2i(Vector2(position).lerp(target, minf(delta * 10.0, 1.0)))\n\n\nfunc _process(delta: float) -> void :')
-
           PYEOF
       - name: Install Godot + export templates
         run: |
