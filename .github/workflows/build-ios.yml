@@ -65,6 +65,12 @@ jobs:
           patch("objects/character/tutorial.gd",
               '\treturn UserConfig.get_value("game", "completed_tutorial", false)',
               '\tif OS.has_feature("ios"):\n\t\treturn true\n\treturn UserConfig.get_value("game", "completed_tutorial", false)')
+          patch("scenes/rigs/rig.gd",
+              '\tskeleton = rig.get_child(0).get_node("Skeleton3D")\n',
+              '\tskeleton = rig.get_child(0).get_node("Skeleton3D")\n\t_fix_animation_paths()\n')
+          patch("scenes/rigs/rig.gd",
+              'func set_animation_state(state: AnimationStates) -> void :',
+              'func _fix_animation_paths() -> void:\n\tif animator == null or skeleton == null:\n\t\treturn\n\tvar root_node = animator.get_node_or_null(animator.root_node)\n\tif root_node == null:\n\t\treturn\n\tvar skel_path = str(root_node.get_path_to(skeleton))\n\tvar count = 0\n\tfor lib_name in animator.get_animation_library_list():\n\t\tvar lib = animator.get_animation_library(lib_name)\n\t\tfor anim_name in lib.get_animation_list():\n\t\t\tvar anim = lib.get_animation(anim_name)\n\t\t\tfor i in range(anim.get_track_count()):\n\t\t\t\tvar t = anim.track_get_type(i)\n\t\t\t\tif t == Animation.TYPE_POSITION_3D or t == Animation.TYPE_ROTATION_3D or t == Animation.TYPE_SCALE_3D:\n\t\t\t\t\tvar bone = anim.track_get_path(i).get_concatenated_subnames()\n\t\t\t\t\tif bone != "" and skeleton.find_bone(bone) >= 0:\n\t\t\t\t\t\tanim.track_set_path(i, NodePath(skel_path + ":" + bone))\n\t\t\t\t\t\tcount += 1\n\tanimation_tree.clear_caches()\n\tprinterr("[ANIMFIX] retargeted tracks: ", count, " path: ", skel_path)\n\n\nfunc set_animation_state(state: AnimationStates) -> void :')
           PYEOF
       - name: Install Godot + export templates
         run: |
