@@ -62,6 +62,9 @@ jobs:
           patch("objects/character/roaming_controller.gd",
               'func get_random_roam_position(target_screen: int = Util.get_current_screen()) -> Vector2i:\n',
               'func get_random_roam_position(target_screen: int = Util.get_current_screen()) -> Vector2i:\n\tif OS.has_feature("ios"):\n\t\tvar ws = DisplayServer.window_get_size(0)\n\t\treturn Vector2i(randi_range(-ws.x / 2 + 300, ws.x / 2 - 300), randi_range(-ws.y / 2 + 460, ws.y / 2 - 460))\n')
+                        patch("objects/character/tutorial.gd",
+              '\treturn UserConfig.get_value("game", "completed_tutorial", false)',
+              '\tif OS.has_feature("ios"):\n\t\treturn true\n\treturn UserConfig.get_value("game", "completed_tutorial", false)')
           PYEOF
       - name: Install Godot + export templates
         run: |
