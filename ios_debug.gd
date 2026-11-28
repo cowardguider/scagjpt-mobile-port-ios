@@ -18,7 +18,7 @@ func _ready() -> void:
     var bg := ColorRect.new()
     bg.color = Color(0, 0, 0, 0.5)
     bg.position = Vector2(0, 40)
-    bg.size = Vector2(620, 290)
+    bg.size = Vector2(640, 330)
     bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(bg)
     label = Label.new()
@@ -89,6 +89,32 @@ func _input(event: InputEvent) -> void:
             if event.position.distance_to(starts[event.index]) > 12.0:
                 _scroll_by(event.relative.y)
 
+func _anim_report() -> String:
+    var rig = Globals.character.rig
+    if rig == null or rig.animator == null:
+        return "no animator"
+    var a: AnimationPlayer = rig.animator
+    var base: Node = a.get_node_or_null(a.root_node)
+    if not a.has_animation("anim/Idle"):
+        return "no anim/Idle; libs: %s" % str(a.get_animation_library_list())
+    var anim: Animation = a.get_animation("anim/Idle")
+    var n := anim.get_track_count()
+    var ok := 0
+    for i in n:
+        var p: NodePath = anim.track_get_path(i)
+        var node = null
+        if base:
+            node = base.get_node_or_null(NodePath(p.get_concatenated_names()))
+        if node:
+            if p.get_subname_count() > 0 and node is Skeleton3D:
+                if node.find_bone(p.get_concatenated_subnames()) >= 0:
+                    ok += 1
+            else:
+                ok += 1
+    var sk: Skeleton3D = rig.skeleton
+    var bone := str(sk.get_bone_pose_rotation(sk.get_bone_count() / 2))
+    return "Idle tracks %d ok %d len %.1f\nbone: %s" % [n, ok, anim.length, bone]
+
 func _process(delta: float) -> void:
     var vs := get_viewport().get_visible_rect().size
     btn.position = Vector2(vs.x - 190, vs.y - 330)
@@ -105,16 +131,4 @@ func _process(delta: float) -> void:
         if not list.is_empty():
             var sc: ScrollContainer = list[list.size() - 1]
             var bar = sc.get_v_scroll_bar()
-            info = "v=%d max=%d page=%d" % [sc.scroll_vertical, int(bar.max_value), int(bar.page)]
-        text += "scroller: %s\n" % info
-        var rig = Globals.character.rig
-        if rig and rig.animation_tree:
-            var tree = rig.animation_tree
-            if not tree.active:
-                tree.active = true
-            text += "tree active: %s\n" % str(tree.active)
-            text += "tree state: %s\n" % str(tree.get("parameters/state/current_state"))
-            text += "player: %s\n" % (rig.animator.current_animation if rig.animator else "no player")
-    text += "last input: %s\n" % last_event
-    label.text = text
-    printerr("[IOSDBG] ", text.replace("\n", " | "))
+            info = "v=%d max=%
